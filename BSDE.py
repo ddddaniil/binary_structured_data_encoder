@@ -14,13 +14,14 @@ def serialize(obj):
 
         elif isinstance(data, str):
             encoded_str = data.encode('utf-8')
-            return b'\x02' + len(encoded_str).to_bytes(4, byteorder='big') + encoded_str
+            return b'\x02' + encoded_str
 
         elif isinstance(data, bool):
             return b'\x03' + (b'\x01' if data else b'\x00')
 
         elif isinstance(data, list):
-            encoded_list = b'\x04' + len(data).to_bytes(4, byteorder='big')
+            # encoded_list = b'\x04' + len(data).to_bytes(4, byteorder='big')
+            encoded_list = b'\x04'
             for item in data:
                 encoded_list += _encode(item)
             return encoded_list
@@ -65,15 +66,12 @@ def deserialize(obj):
         elif data_type == 4:
             list_len = int.from_bytes(bytes_data[:4], byteorder='big')
             decoded_list = []
-            bytes_data = bytes_data[4:]
+            offset = 4
             for _ in range(list_len):
-                decoded_item = _decode(bytes_data)
-                # Если _decode возвращает два значения, распаковываем их
-                if isinstance(decoded_item, tuple):
-                    decoded_item, bytes_data = decoded_item
-                    bytes_data = decoded_item[1]
-                decoded_list.append(decoded_item)
-            return decoded_list, bytes_data
+                decoded_obj = _decode(bytes_data[offset:])
+                decoded_list.append(decoded_obj)
+                offset += 4
+            return decoded_list
 
         elif data_type == 5:
             dict_len = int.from_bytes(bytes_data[:4], byteorder='big')
@@ -99,11 +97,21 @@ def deserialize(obj):
             raise TypeError(f"Unsupported data type: {data_type}")
 
     obj_len = int.from_bytes(obj[:4], byteorder='big')
-    obj = _decode(obj[4:])
-    return obj_len, obj
+    result = _decode(obj[4:])
+    return f'object length:{obj_len}', result
 
 
 obj = [1,2,3]
+# obj = {
+#     "name": "John",
+#     "age": 30,
+#     "is_student": False,
+#     "friends": [
+#         {"name": "Jane", "age": 25},
+#         {"name": "Mike", "age": 32}
+#     ]
+# }
 
 print(serialize(obj))
-print(deserialize(serialize(obj)))
+ser = serialize(obj)
+print(deserialize(ser))
