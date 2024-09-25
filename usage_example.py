@@ -12,7 +12,7 @@ obj = {
     ]
 }
 
-from BSDE import *
+from test import *
 # Замеры времени кодирования/декодирования для своего формата
 start_time = time.time()
 encoded_data_custom = serialize(obj)

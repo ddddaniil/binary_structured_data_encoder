@@ -1,101 +1,117 @@
-class SimpleObjectSerializer:
+import struct
 
-    def __init__(self):
-        self.types = {
-            int: self._encode_int,
-            str: self._encode_str,
-            list: self._encode_list,
-            dict: self._encode_dict,
-        }
 
-    def serialize(self, obj):
-        return self._encode(obj)
+def serialize(obj):
+    """Сериализует объект в байты."""
 
-    def deserialize(self, data):
-        return self._decode(data)
+    def _encode(data):
+        """Вспомогательная функция для кодирования."""
+        if isinstance(data, int):
+            return b'\x00' + data.to_bytes(4, byteorder='big')
 
-    def _encode(self, obj):
-        if isinstance(obj, type(None)):
-            return b'\x00'
-        data_type = type(obj)
-        encoder = self.types.get(data_type)
-        if encoder:
-            return encoder(obj)
+        elif isinstance(data, float):
+            return b'\x01' + struct.pack('>f', data)
+
+        elif isinstance(data, str):
+            encoded_str = data.encode('utf-8')
+            return b'\x02' + encoded_str
+
+        elif isinstance(data, bool):
+            return b'\x03' + (b'\x01' if data else b'\x00')
+
+        elif isinstance(data, list):
+            # encoded_list = b'\x04' + len(data).to_bytes(4, byteorder='big')
+            encoded_list = b'\x04'
+            for item in data:
+                encoded_list += _encode(item)
+            return encoded_list
+
+        elif isinstance(data, dict):
+            encoded_dict = b'\x05' + len(data).to_bytes(4, byteorder='big')
+            for key, value in data.items():
+                encoded_dict += _encode(key) + _encode(value)
+            return encoded_dict
+
+        elif data is None:
+            return b'\x06'
+
         else:
-            raise TypeError(f"Unsupported type: {data_type}")
+            raise TypeError(f"Unsupported type: {type(data)}")
 
-    def _decode(self, data):
-        if data == b'\x00':
-            return None
+    encoded_obj = _encode(obj)
+    return len(encoded_obj).to_bytes(4, byteorder='big') + encoded_obj
 
-        if not data:
-            return None, data
 
-        data_type = data[0]
+def deserialize(obj):
+    """Десериализует байты в объект."""
+
+    def _decode(bytes_data):
+        """Вспомогательная функция для декодирования."""
+        data_type = bytes_data[0]
+        bytes_data = bytes_data[1:]
+
         if data_type == 0:
-            return self._decode_int(data[1:])
+            return int.from_bytes(bytes_data[:4], byteorder='big')
+
         elif data_type == 1:
-            return self._decode_str(data[1:])
+            return struct.unpack('>f', bytes_data[:4])[0]
+
         elif data_type == 2:
-            return self._decode_list(data[1:])
+            str_len = int.from_bytes(bytes_data[:4], byteorder='big')
+            return bytes_data[4:4+str_len].decode('utf-8')
+
         elif data_type == 3:
-            return self._decode_dict(data[1:])
+            return bool(bytes_data[0])
+
+        elif data_type == 4:
+            list_len = int.from_bytes(bytes_data[:4], byteorder='big')
+            decoded_list = []
+            offset = 4
+            for _ in range(list_len):
+                decoded_obj = _decode(bytes_data[offset:])
+                decoded_list.append(decoded_obj)
+                offset += 4
+            return decoded_list
+
+        elif data_type == 5:
+            dict_len = int.from_bytes(bytes_data[:4], byteorder='big')
+            decoded_dict = {}
+            bytes_data = bytes_data[4:]
+            for _ in range(dict_len):
+                # Декодируем ключ
+                key, bytes_data = _decode(bytes_data)  # Возвращает 2 значения (ключ и остаток байтов)
+                # Декодируем значение
+                value = _decode(bytes_data)  # Возвращает 1 значение (значение)
+
+                # Если _decode возвращает 2 значения, обновляем bytes_data
+                if isinstance(value, tuple):
+                    value, bytes_data = value
+
+                decoded_dict[key] = value
+            return decoded_dict, bytes_data
+
+        elif data_type == 6:
+            return None, bytes_data
+
         else:
-            raise ValueError(f"Unknown data type: {data_type}")
+            raise TypeError(f"Unsupported data type: {data_type}")
 
-    def _encode_int(self, obj):
-        return b'\x00' + obj.to_bytes((obj.bit_length() + 7) // 8, 'big')
+    obj_len = int.from_bytes(obj[:4], byteorder='big')
+    result = _decode(obj[4:])
+    return f'object length:{obj_len}', result
 
-    def _encode_str(self, obj):
-        encoded_str = obj.encode('utf-8')
-        return b'\x01' + len(encoded_str).to_bytes(4, 'big') + encoded_str
-
-    def _encode_list(self, obj):
-        encoded_list = b''
-        for item in obj:
-            encoded_list += self._encode(item)
-        return b'\x02' + len(encoded_list).to_bytes(4, 'big') + encoded_list
-
-    def _encode_dict(self, obj):
-        encoded_dict = b''
-        for key, value in obj.items():
-            encoded_dict += self._encode(key) + self._encode(value)
-        return b'\x03' + len(encoded_dict).to_bytes(4, 'big') + encoded_dict
-
-    def _decode_int(self, data):
-        return int.from_bytes(data, 'big')
-
-    def _decode_str(self, data):
-        length = int.from_bytes(data[:4], 'big')
-        return data[4:4 + length].decode('utf-8')
-
-    def _decode_list(self, data):
-        length = int.from_bytes(data[:4], 'big')
-        decoded_list = []
-        offset = 4
-        for _ in range(length):
-            decoded_item = self._decode(data[offset:])
-            decoded_list.append(decoded_item)
-            offset += len(self._encode(decoded_item))
-        return decoded_list
-
-    def _decode_dict(self, data):
-        length = int.from_bytes(data[:4], 'big')
-        decoded_dict = {}
-        offset = 4
-        while offset < length + 4:
-            key = self._decode(data[offset:])
-            offset += len(self._encode(key))
-            value = self._decode(data[offset:])
-            offset += len(self._encode(value))
-            decoded_dict[key] = value
-        return decoded_dict
 
 obj = [1,2,3]
-# ser = SimpleObjectSerializer().serialize(obj)
-# des = SimpleObjectSerializer().deserialize(ser)
-enc = SimpleObjectSerializer()._encode_list(obj)
-dec = SimpleObjectSerializer()._decode(enc)
+# obj = {
+#     "name": "John",
+#     "age": 30,
+#     "is_student": False,
+#     "friends": [
+#         {"name": "Jane", "age": 25},
+#         {"name": "Mike", "age": 32}
+#     ]
+# }
 
-#print(ser, des, sep='\n')
-print(enc)
+print(serialize(obj))
+ser = serialize(obj)
+print(deserialize(ser))
