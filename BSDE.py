@@ -14,10 +14,12 @@ class SimpleObjectSerializer:
         }
 
     def serialize(self, obj):
-        return self._encode(obj)
+        serialized_obj = self._encode(obj)
+        return serialized_obj
 
     def deserialize(self, data):
-        return self._decode(data)
+        deserialized_obj = self._decode(data)
+        return deserialized_obj
 
     def _encode(self, obj):
         if isinstance(obj, type(None)):
@@ -117,19 +119,19 @@ class SimpleObjectSerializer:
         return decoded_dict
 
 
-#obj = {'a': '1', 'b': {'1': 'a'}, 'c': '2', 'd': 2.202}
-#obj = {'a': '1', 'b': '2', 'c': {'d': '3'}}
-obj = {
-    "name": "John Doe",
-    "age": 30.0,
-    "is_active": True,
-    "hobbies": ["reading", "coding"]
-}
-
-ser = SimpleObjectSerializer().serialize(obj)
-des = SimpleObjectSerializer().deserialize(ser)
-# enc = SimpleObjectSerializer()._encode_list(obj)
-# dec = SimpleObjectSerializer()._decode(enc)
-
-print(ser, des, sep='\n')
-# print(enc)
+# #obj = {'a': '1', 'b': {'1': 'a'}, 'c': '2', 'd': 2.202}
+# #obj = {'a': '1', 'b': '2', 'c': {'d': '3'}}
+# obj = {
+#     "name": "John Doe",
+#     "age": 30.0,
+#     "is_active": True,
+#     "hobbies": ["reading", "coding"]
+# }
+#
+# ser = SimpleObjectSerializer().serialize(obj)
+# des = SimpleObjectSerializer().deserialize(ser)
+# # enc = SimpleObjectSerializer()._encode_list(obj)
+# # dec = SimpleObjectSerializer()._decode(enc)
+#
+# print(ser, des, sep='\n')
+# # print(enc)
